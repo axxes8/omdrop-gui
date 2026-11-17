@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Omdrop
+Comment=Send files to nearby AirDrop devices
+Exec=omdrop
+Icon=omdrop
+Categories=Network;FileTransfer;
+Terminal=false

@@ -1,0 +1,52 @@
+name: Build AppImage
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  appimage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Test
+        run: QT_QPA_PLATFORM=offscreen python -m unittest -v test_omdrop_gui
+      - name: Bundle application
+        run: |
+          python -m PyInstaller --noconfirm --clean --onedir --name omdrop omdrop_gui.py
+          mkdir -p AppDir/usr/bin
+          cp -a dist/omdrop AppDir/usr/bin/
+          cp packaging/AppRun packaging/omdrop.desktop packaging/omdrop.svg AppDir/
+          chmod +x AppDir/AppRun
+      - name: Build AppImage
+        run: |
+          curl --fail --location --retry 3 -o appimagetool.AppImage \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 ./appimagetool.AppImage AppDir Omdrop-x86_64.AppImage
+          chmod +x Omdrop-x86_64.AppImage
+      - name: Smoke-test AppImage
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 10s ./Omdrop-x86_64.AppImage
+          status=$?
+          set -e
+          if [ "$status" -ne 124 ]; then
+            echo "AppImage exited unexpectedly with status $status"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Omdrop-x86_64-AppImage
+          path: Omdrop-x86_64.AppImage
+          if-no-files-found: error
